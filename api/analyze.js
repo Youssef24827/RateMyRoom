@@ -14,33 +14,40 @@ export default async function handler(req, res) {
             });
         }
 
-        const response = await fetch(
-            "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=" +
-            process.env.GEMINI_API_KEY,
-            {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    contents: [
-                        {
-                            parts: [
-                                {
-                                    inline_data: {
-                                        mime_type: "image/jpeg",
-                                        data: image
-                                    }
-                                },
-                                {
-                                    text: `
+        const maxRetries = 3;
+
+        let response;
+        let data;
+
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+
+            response = await fetch(
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.6-flash:generateContent?key=" +
+                process.env.GEMINI_API_KEY,
+                {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        contents: [
+                            {
+                                parts: [
+                                    {
+                                        inline_data: {
+                                            mime_type: "image/jpeg",
+                                            data: image
+                                        }
+                                    },
+                                    {
+                                        text: `
 Tu es un expert en rangement, organisation et décoration intérieure.
 
 Analyse cette photo de chambre.
 
 Donne une note globale sur 10.
 
-Analyse les catégories suivantes :
+Analyse :
 - rangement
 - organisation
 - éclairage
@@ -71,21 +78,44 @@ Format obligatoire :
 Les notes doivent être entre 0 et 10.
 Le temps doit être un nombre entier en minutes.
 `
-                                }
-                            ]
-                        }
-                    ]
-                })
+                                    }
+                                ]
+                            }
+                        ]
+                    })
+                }
+            );
+
+            data = await response.json();
+
+            // Si Gemini répond correctement, on arrête les tentatives.
+            if (response.ok) {
+                break;
             }
-        );
 
-        const data = await response.json();
+            // On retente uniquement pour les erreurs temporaires.
+            if (response.status !== 503 && response.status !== 429) {
+                break;
+            }
 
+            // Pas besoin d'attendre après la dernière tentative.
+            if (attempt < maxRetries - 1) {
+                const delay = 3000 * Math.pow(2, attempt);
+
+                console.log(
+                    `Gemini temporairement indisponible. Nouvelle tentative dans ${delay / 1000}s...`
+                );
+
+                await new Promise(resolve => setTimeout(resolve, delay));
+            }
+        }
+
+        // Gemini est toujours en erreur après les tentatives.
         if (!response.ok) {
             console.error("ERREUR GEMINI :", data);
 
             return res.status(500).json({
-                error: "Erreur Gemini",
+                error: "Gemini est temporairement indisponible.",
                 details: data
             });
         }
@@ -97,7 +127,7 @@ Le temps doit être un nombre entier en minutes.
             console.error("REPONSE GEMINI VIDE :", data);
 
             return res.status(500).json({
-                error: "Gemini n'a pas retourné de résultat",
+                error: "Gemini n'a pas retourné de résultat.",
                 details: data
             });
         }
@@ -112,10 +142,11 @@ Le temps doit être un nombre entier en minutes.
         try {
             result = JSON.parse(cleanText);
         } catch (parseError) {
+
             console.error("JSON GEMINI INVALIDE :", cleanText);
 
             return res.status(500).json({
-                error: "Gemini a retourné un JSON invalide",
+                error: "Gemini a retourné un JSON invalide.",
                 details: cleanText
             });
         }

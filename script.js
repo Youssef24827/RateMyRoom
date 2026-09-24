@@ -1,6 +1,7 @@
 const imageInput = document.querySelector("#image");
 const analyzeButton = document.querySelector("#analyze");
 const result = document.querySelector("#result");
+console.log("RateMyRoom fonctionne !");
 
 analyzeButton.addEventListener("click", async () => {
 

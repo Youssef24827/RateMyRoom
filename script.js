@@ -86,7 +86,11 @@ analyzeButton.addEventListener("click", async () => {
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || "Erreur pendant l'analyse");
+            throw new Error(
+                data.details
+                    ? JSON.stringify(data.details)
+                    : (data.error || "Erreur pendant l'analyse")
+            );
         }
 
         result.innerHTML = `
@@ -111,6 +115,15 @@ analyzeButton.addEventListener("click", async () => {
                     <strong>(${tache.temps} min)</strong>
                 </div>
             `).join("")}
+
+            <br>
+
+            <p>
+                ⏱️ Temps total estimé :
+                <strong>
+                    ${data.taches.reduce((total, tache) => total + tache.temps, 0)} minutes
+                </strong>
+            </p>
         `;
 
     } catch (error) {
@@ -118,8 +131,10 @@ analyzeButton.addEventListener("click", async () => {
         console.error(error);
 
         result.innerHTML = `
-            <p>❌ Une erreur est survenue.</p>
-            <p>${error.message}</p>
+            <h2>❌ Erreur</h2>
+            <p style="word-break: break-word;">
+                ${error.message}
+            </p>
         `;
 
     } finally {

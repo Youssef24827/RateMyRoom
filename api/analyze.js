@@ -34,21 +34,25 @@ export default async function handler(req, res) {
                                 },
                                 {
                                     text: `
-Tu es un expert en rangement et organisation.
+Tu es un expert en rangement, organisation et décoration intérieure.
 
 Analyse cette photo de chambre.
 
 Donne une note globale sur 10.
 
-Analyse :
+Analyse les catégories suivantes :
 - rangement
 - organisation
 - éclairage
 - décoration
 
-Identifie les choses qui pourraient être rangées ou améliorées.
+Identifie les choses qui pourraient être rangées, nettoyées ou améliorées.
 
-Retourne UNIQUEMENT du JSON dans ce format :
+Propose des tâches simples et concrètes avec une estimation du temps en minutes.
+
+Retourne UNIQUEMENT un JSON valide, sans markdown et sans texte supplémentaire.
+
+Format obligatoire :
 
 {
   "note": 0,
@@ -65,7 +69,7 @@ Retourne UNIQUEMENT du JSON dans ce format :
 }
 
 Les notes doivent être entre 0 et 10.
-Le temps doit être estimé en minutes.
+Le temps doit être un nombre entier en minutes.
 `
                                 }
                             ]
@@ -78,6 +82,8 @@ Le temps doit être estimé en minutes.
         const data = await response.json();
 
         if (!response.ok) {
+            console.error("ERREUR GEMINI :", data);
+
             return res.status(500).json({
                 error: "Erreur Gemini",
                 details: data
@@ -88,8 +94,11 @@ Le temps doit être estimé en minutes.
             data.candidates?.[0]?.content?.parts?.[0]?.text;
 
         if (!text) {
+            console.error("REPONSE GEMINI VIDE :", data);
+
             return res.status(500).json({
-                error: "Gemini n'a pas retourné de résultat"
+                error: "Gemini n'a pas retourné de résultat",
+                details: data
             });
         }
 
@@ -98,11 +107,24 @@ Le temps doit être estimé en minutes.
             .replace(/```/g, "")
             .trim();
 
-        const result = JSON.parse(cleanText);
+        let result;
+
+        try {
+            result = JSON.parse(cleanText);
+        } catch (parseError) {
+            console.error("JSON GEMINI INVALIDE :", cleanText);
+
+            return res.status(500).json({
+                error: "Gemini a retourné un JSON invalide",
+                details: cleanText
+            });
+        }
 
         return res.status(200).json(result);
 
     } catch (error) {
+
+        console.error("ERREUR SERVEUR :", error);
 
         return res.status(500).json({
             error: "Erreur serveur",
